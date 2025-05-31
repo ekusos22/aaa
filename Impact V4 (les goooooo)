@@ -3,7 +3,7 @@
 // @namespace    http://7granddadpgn.github.io
 // @version      v2
 // @description  A browser script made to give huge enhancements on Miniblox!
-// @author       7GrandDad, RealPacket, LiquidSquid1, ee6-lang, ProgMEM-CC, ekusos22
+// @author       7GrandDad, RealPacket, LiquidSquid1, ee6-lang, ProgMEM-CC, ekusos22, sstvskids
 // @match        https://miniblox.io/*
 // @icon         https://miniblox.io/favicon.png
 // @grant        GM_getValue
