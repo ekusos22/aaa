@@ -3,7 +3,7 @@
 // @namespace    http://7granddadpgn.github.io
 // @version      v2
 // @description  A browser script made to give huge enhancements on Miniblox! if you helped with either Vape/Impact you are goated!
-// @author       7GrandDad (Og creator of Vape v4), RealPacket (Helped with Vape v4), LiquidSquid1 (created invisible filter bypass), ee6-lang (Helped with Impact v4, created GUI and changed bits of code etc), ProgMEM-CC (og Impact v4 dev), ekusos22, sstvskids, Phyrenos
+// @author       7GrandDad (Og creator of Vape v4), RealPacket (Helped with Vape v4), LiquidSquid1 (created invisible filter bypass), ee6-lang (Helped with Impact v4, created GUI and changed bits of code etc), ProgMEM-CC (og Impact v4 dev), ekusos22 (Forked Impact and changed bits of code), sstvskids (created desync pretty sure), Phyrenos
 // @match        https://miniblox.io/*
 // @icon         https://miniblox.io/favicon.png
 // @grant        GM_getValue
