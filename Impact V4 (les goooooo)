@@ -1235,226 +1235,144 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 				}
 			});
 
-           // === AutoDrop v4.2 by Jake ===
-// 🛡️ Optimized Armor | 🗡️ Smart Weapon | 🪓 Pick + Axe | 🎯 Anti-Cheat Safe | ✅ No Duplicates | 🧼 Clean Overlay
+           const AutoDrop = new Module("AutoDrop", function (callback) {
+    if (!callback) {
+        delete tickLoop["AutoDrop"];
+        hud3D.remove("AutoDropOverlay");
+        return;
+    }
 
-// --- Drop Queue + Retry ---
-const dropQueue = [];
-let dropCooldown = 0;
+    let dropVisuals = new Map();
+    let dropTypeMap = new Map();
+    const bestArmor = {};
+    let lastRun = 0;
 
-function validateAndDrop(index, tries = 0) {
-	const windowId = player?.openContainer?.windowId ?? -1;
-	if (windowId === -1 || tries >= 2) return;
+    const weaponClasses = new Set(["ItemSword", "ItemAxe", "ItemBow", "ItemPickaxe"]);
+    const essentialsKeywords = ["gapple", "golden apple", "ender pearl", "fire charge"];
 
-	const slot = player.inventoryContainer.inventorySlots[index];
-	if (!slot || !slot.getHasStack()) return;
+    const armorMaterialPriority = ["leather", "chain", "iron", "diamond"];
+    const customArmorKeepList = ["god helmet", "legend boots"];
 
-	const pre = slot.getStack();
-	dropQueue.push(() => {
-		playerControllerDump.windowClickDump(windowId, index, 4, 0, player);
-		setTimeout(() => {
-			const slotAfter = player.inventoryContainer.inventorySlots[index];
-			if (slotAfter?.getHasStack() && slotAfter.getStack().isItemEqual(pre)) {
-				validateAndDrop(index, tries + 1); // retry once
-			}
-		}, 50);
-	});
-}
+    function getArmorScore(stack) {
+        const item = stack.getItem();
+        const material = item.getArmorMaterial?.()?.toLowerCase?.() || "unknown";
+        const materialIndex = armorMaterialPriority.indexOf(material);
+        const materialScore = materialIndex === -1 ? -999 : materialIndex * 1000;
 
-tickLoop["AutoDrop_DropHandler"] = function () {
-	if (dropCooldown > 0) {
-		dropCooldown--;
-		return;
-	}
-	if (dropQueue.length > 0) {
-		dropQueue.shift()();
-		dropCooldown = 3 + Math.floor(Math.random() * 2);
-	}
-};
+        const durabilityScore = stack.getMaxDamage() - stack.getItemDamage();
+        return materialScore + durabilityScore;
+    }
 
-// --- Priority Tables ---
-const armorPriority = { leather: 1, chain: 2, iron: 3, diamond: 4 };
-const weaponPriority = { wood: 1, stone: 2, iron: 3, diamond: 4 };
-const toolPriority = { wood: 1, stone: 2, iron: 3, diamond: 4 };
+    tickLoop["AutoDrop"] = function () {
+        const now = Date.now();
+        if (now - lastRun < 100) return;
+        lastRun = now;
 
-// --- Metadata Functions ---
-function getArmorMeta(stack) {
-	const name = stack.getDisplayName().toLowerCase();
-	if (name.includes("diamond")) return { tier: "diamond", tierValue: 4 };
-	if (name.includes("iron")) return { tier: "iron", tierValue: 3 };
-	if (name.includes("chain")) return { tier: "chain", tierValue: 2 };
-	if (name.includes("leather")) return { tier: "leather", tierValue: 1 };
-	return { tier: "unknown", tierValue: 0 };
-}
+        const keptTypes = new Set();
+        const toDrop = [];
 
-function getWeaponMeta(stack) {
-	const name = stack.getDisplayName().toLowerCase();
-	if (name.includes("diamond")) return { tier: "diamond", tierValue: 4 };
-	if (name.includes("iron")) return { tier: "iron", tierValue: 3 };
-	if (name.includes("stone")) return { tier: "stone", tierValue: 2 };
-	if (name.includes("wood")) return { tier: "wood", tierValue: 1 };
-	return { tier: "unknown", tierValue: 0 };
-}
+        if (!player.openContainer || player.openContainer !== player.inventoryContainer) return;
+        const slots = player.inventoryContainer.inventorySlots;
+        if (!slots || slots.length < 36) return;
 
-function getToolMeta(stack) {
-	const name = stack.getDisplayName().toLowerCase();
-	let type = null;
-	if (name.includes("pick")) type = "pickaxe";
-	else if (name.includes("axe")) type = "axe";
+        Object.keys(bestArmor).forEach(k => delete bestArmor[k]);
 
-	let tier = "unknown";
-	let tierValue = 0;
-	if (name.includes("diamond")) { tier = "diamond"; tierValue = 4; }
-	else if (name.includes("iron")) { tier = "iron"; tierValue = 3; }
-	else if (name.includes("stone")) { tier = "stone"; tierValue = 2; }
-	else if (name.includes("wood")) { tier = "wood"; tierValue = 1; }
+        [5, 6, 7, 8].forEach(i => {
+            const slot = slots[i];
+            if (!slot?.getHasStack()) return;
+            const stack = slot.getStack();
+            if (!(stack.getItem() instanceof ItemArmor)) return;
+            const armorType = stack.getItem().armorType ?? "unknown";
+            bestArmor["armor_" + armorType] = { stack, index: i };
+        });
 
-	return { type, tier, tierValue };
-}
+        for (let i = 0; i < 36; i++) {
+            const slot = slots[i];
+            if (!slot?.getHasStack()) continue;
 
-// --- Main Module ---
-const AutoDrop = new Module("AutoDrop", function (enabled) {
-	if (enabled) {
-		let dropVisuals = [];
+            const stack = slot.getStack();
+            const item = stack.getItem();
+            const name = stack.getDisplayName().toLowerCase();
 
-		tickLoop["AutoDrop"] = function () {
-			dropVisuals = [];
-			if (!player.openContainer || player.openContainer !== player.inventoryContainer) return;
+            if (essentialsKeywords.some(k => name.includes(k))) continue;
+            if (customArmorKeepList.some(k => name.includes(k))) continue;
 
-			const slots = player.inventoryContainer.inventorySlots;
-			const keptTypes = new Set();
-			const bestArmor = { 0: null, 1: null, 2: null, 3: null }; // boots, legs, chest, helmet
-			AutoDrop.bestWeapon = null;
-			AutoDrop.bestTools = { pickaxe: null, axe: null };
+            if (item instanceof ItemBlock) {
+                if (stack.stackSize < 5) {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "block");
+                }
+                continue;
+            }
 
-			for (let i = 0; i < 36; i++) {
-				const slot = slots[i];
-				if (!slot || !slot.getHasStack()) continue;
+            if (item instanceof ItemArmor) {
+                const armorType = item.armorType ?? "unknown";
+                const key = "armor_" + armorType;
+                const score = getArmorScore(stack);
+                const existing = bestArmor[key];
+                const existingScore = existing ? getArmorScore(existing.stack) : -1;
 
-				const stack = slot.getStack();
-				const item = stack.getItem();
-				const name = stack.getDisplayName().toLowerCase();
+                if (!existing || score > existingScore) {
+                    if (existing && existing.index !== i) {
+                        toDrop.push(existing.index);
+                        dropTypeMap.set(existing.index, "worse_armor");
+                    }
+                    bestArmor[key] = { stack, index: i };
+                } else {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "armor_dupe");
+                }
+                continue;
+            }
 
-				// Whitelisted survival items
-				if (
-					name.includes("gapple") ||
-					name.includes("golden apple") ||
-					name.includes("ender pearl") ||
-					name.includes("fire charge")
-				) continue;
+            const className = item.constructor.name;
+            if (weaponClasses.has(className)) {
+                if (!keptTypes.has(className)) {
+                    keptTypes.add(className);
+                } else {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "weapon_dupe");
+                }
+                continue;
+            }
 
-				// Drop bad blocks
-				if (item instanceof ItemBlock) {
-					if (stack.stackSize >= 5) continue;
-					validateAndDrop(i);
-					dropVisuals.push(i);
-					continue;
-				}
+            toDrop.push(i);
+            dropTypeMap.set(i, "junk");
+        }
 
-				// Armor filter
-				if (item instanceof ItemArmor) {
-					const slotType = item.armorType;
-					const meta = getArmorMeta(stack);
-					const durability = stack.getMaxDamage() > 0
-						? (stack.getMaxDamage() - stack.getItemDamage()) / stack.getMaxDamage()
-						: 1;
-					const current = bestArmor[slotType];
-					if (!current || meta.tierValue > current.tier ||
-						(meta.tierValue === current.tier && durability > current.durability)) {
-						if (current && current.index !== -1) {
-							validateAndDrop(current.index);
-							dropVisuals.push(current.index);
-						}
-						bestArmor[slotType] = {
-							index: i,
-							tier: meta.tierValue,
-							durability
-						};
-					} else {
-						validateAndDrop(i);
-						dropVisuals.push(i);
-					}
-					continue;
-				}
+        toDrop.forEach(slot => {
+            dropSlot(slot);
+            dropVisuals.set(slot, now);
+        });
 
-				// Weapon filter
-				if (item instanceof ItemSword) {
-					const meta = getWeaponMeta(stack);
-					const durability = stack.getMaxDamage() > 0
-						? (stack.getMaxDamage() - stack.getItemDamage()) / stack.getMaxDamage()
-						: 1;
-					const current = AutoDrop.bestWeapon;
-					if (!current || meta.tierValue > current.tier ||
-						(meta.tierValue === current.tier && durability > current.durability)) {
-						if (current && current.index !== -1) {
-							validateAndDrop(current.index);
-							dropVisuals.push(current.index);
-						}
-						AutoDrop.bestWeapon = {
-							index: i,
-							tier: meta.tierValue,
-							durability
-						};
-					} else {
-						validateAndDrop(i);
-						dropVisuals.push(i);
-					}
-					continue;
-				}
+        if (now % 1000 < 100) {
+            dropVisuals.forEach((time, slot) => {
+                if (now - time > 500) dropVisuals.delete(slot);
+            });
+        }
+    };
 
-				// Tool filter
-				if (item instanceof ItemTool) {
-					const meta = getToolMeta(stack);
-					if (!meta.type || !meta.tier) continue;
-					const durability = stack.getMaxDamage() > 0
-						? (stack.getMaxDamage() - stack.getItemDamage()) / stack.getMaxDamage()
-						: 1;
-					const current = AutoDrop.bestTools[meta.type];
-					if (!current || meta.tierValue > current.tier ||
-						(meta.tierValue === current.tier && durability > current.durability)) {
-						if (current && current.index !== -1) {
-							validateAndDrop(current.index);
-							dropVisuals.push(current.index);
-						}
-						AutoDrop.bestTools[meta.type] = {
-							index: i,
-							tier: meta.tierValue,
-							durability
-						};
-					} else {
-						validateAndDrop(i);
-						dropVisuals.push(i);
-					}
-					continue;
-				}
+    hud3D.add("AutoDropOverlay", function () {
+        dropVisuals.forEach((_, slot) => {
+            const x = (slot % 9) * 20 + 10;
+            const y = Math.floor(slot / 9) * 20 + 60;
+            const type = dropTypeMap.get(slot) || "junk";
 
-				// Final fallback: dedup anything else
-				const typeKey = item.constructor.name + "_" + name;
-				if (!keptTypes.has(typeKey)) {
-					keptTypes.add(typeKey);
-					continue;
-				}
-				validateAndDrop(i);
-				dropVisuals.push(i);
-			}
-		};
+            let color = "rgba(255,0,0,0.6)";
+            if (type === "block") color = "rgba(128,128,128,0.6)";
+            else if (type === "armor_dupe") color = "rgba(255,255,0,0.6)";
+            else if (type === "worse_armor") color = "rgba(255,165,0,0.6)";
+            else if (type === "weapon_dupe") color = "rgba(0,255,255,0.6)";
 
-		// ✅ Corrected hud3D overlay registration
-		hud3D.add("AutoDropOverlay", {
-			render: () => {
-				for (const slot of dropVisuals) {
-					const x = (slot % 9) * 20 + 10;
-					const y = Math.floor(slot / 9) * 20 + 60;
-					drawImage("spritesheet.png", 32, 32, 16, 16, x, y, 16, 16, "rgba(255,0,0,0.6)");
-				}
-			}
-		});
-	} else {
-		delete tickLoop["AutoDrop"];
-		delete tickLoop["AutoDrop_DropHandler"];
-		hud3D.remove("AutoDropOverlay");
-	}
+            drawImage("spritesheet.png", 32, 32, 16, 16, x, y, 16, 16, color);
+        });
+    });
 });
+
+function dropSlot(index) {
+    playerControllerDump.windowClickDump(player.openContainer.windowId, index, 0, 0, player);
+    playerControllerDump.windowClickDump(player.openContainer.windowId, -999, 0, 0, player);
+}
 
 			globalThis.${storeName}.modules = modules;
 			globalThis.${storeName}.profile = "default";
