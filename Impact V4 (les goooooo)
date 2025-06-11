@@ -1,3 +1,61 @@
+// ==UserScript==
+// @name         IMPACT V4 cooking up!
+// @namespace    http://7granddadpgn.github.io
+// @version      v2
+// @description  A browser script made to give huge enhancements on Miniblox! if you helped with either Vape/Impact you are goated!
+// @author       7GrandDad (Og creator of Vape v4), RealPacket (Helped with Vape v4), LiquidSquid1 (created invisible filter bypass), ee6-lang (Helped with Impact v4, created GUI and changed bits of code etc), ProgMEM-CC (og Impact v4 dev), ekusos22 (Forked Impact and changed bits of code), sstvskids (created desync pretty sure), Phyrenos
+// @match        https://miniblox.io/*
+// @icon         https://miniblox.io/favicon.png
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        unsafeWindow
+// @run-at       document-start
+// ==/UserScript==
+
+// would reuse this, but Codeberg doesn't have CORS headers so we can't use it.
+// this would fix the caching issues, but sadly CORS moment.
+/*
+(function() {
+	'use strict';
+
+	async function execute(url, oldScript) {
+		if (oldScript) oldScript.type = 'javascript/blocked';
+		let data = await fetch("https://raw.githubusercontent.com/7GrandDadPGN/VapeForMiniblox/main/injection.js").then(e => e.text());
+		if (oldScript) oldScript.type = 'module';
+		eval(data.replace("scripturl", url));
+	}
+
+	// https://stackoverflow.com/questions/22141205/intercept-and-alter-a-sites-javascript-using-greasemonkey
+	if(navigator.userAgent.indexOf("Firefox") != -1)
+	{
+		window.addEventListener("beforescriptexecute", function(e) {
+			if(e.target.src.includes("https://miniblox.io/assets/index"))
+			{
+				e.preventDefault();
+				e.stopPropagation();
+				execute(e.target.src);
+			}
+		}, false);
+	}
+	else
+	{
+		new MutationObserver(async (mutations, observer) => {
+			let oldScript = mutations
+				.flatMap(e => [...e.addedNodes])
+				.filter(e => e.tagName == 'SCRIPT')
+				.find(e => e.src.includes("https://miniblox.io/assets/index"));
+
+			if (oldScript) {
+				observer.disconnect();
+				execute(oldScript.src, oldScript);
+			}
+		}).observe(document, {
+			childList: true,
+			subtree: true,
+		});
+	}
+})();
+*/
 /**
  * @type {Record<string | RegExp, string>}
  */
@@ -5,7 +63,7 @@ let replacements = {};
 let dumpedVarNames = {};
 const storeName = "a" + crypto.randomUUID().replaceAll("-", "").substring(16);
 const vapeName = crypto.randomUUID().replaceAll("-", "").substring(16);
-const VERSION = "1.1.2";
+const VERSION = "2";
 
 // ANTICHEAT HOOK
 function replaceAndCopyFunction(oldFunc, newFunc) {
@@ -67,7 +125,8 @@ function modifyCode(text) {
 
 	for(const [replacement, code] of Object.entries(replacements)) {
 		modifiedText = modifiedText.replace(replacement, code[1] ? code[0] : replacement + code[0]);
-
+		// TODO: handle the 2nd occurrence, which inside a string in a varible called "jsContent".
+		// (screw you vector)
 	}
 
 	const newScript = document.createElement("script");
@@ -142,7 +201,7 @@ function modifyCode(text) {
 	`);
 
 	addModification('VERSION$1," | ",', `"${vapeName} v${VERSION}"," | ",`);
-	addModification('if(!x.canConnect){', 'x.errorMessage = x.errorMessage === "Could not join server. You are connected to a VPN or proxy. Please disconnect from it and refresh the page." ? "You\'re maybe IP banned or you\'re using a vpn " : x.errorMessage;');
+	addModification('if(!x.canConnect){', 'x.errorMessage = x.errorMessage === "Could not join server. You are connected to a VPN or proxy. Please disconnect from it and refresh the page." ? "[Vape] You\'re IP banned (these probably don\'t exist now anyways)" : x.errorMessage;');
 
 	// DRAWING SETUP
 	addModification('I(this,"glintTexture");', `
@@ -159,8 +218,8 @@ function modifyCode(text) {
 	addModification('skinManager.loadTextures(),', ',this.loadVape(),');
 	addModification('async loadSpritesheet(){', `
 		async loadVape() {
-			this.vapeTexture = await this.loader.loadAsync("${corsMoment("https://raw.githubusercontent.com/progmem-cc/miniblox.impact.client.updatedv2/refs/heads/main/logo.png")}");
-			this.v4Texture = await this.loader.loadAsync("${corsMoment("https://raw.githubusercontent.com/progmem-cc/miniblox.impact.client.updatedv2/refs/heads/main/logov4.png")}");
+			this.vapeTexture = await this.loader.loadAsync("${corsMoment("https://raw.githubusercontent.com/Coldmc33/miniblox.impact.client.updatedv2/refs/heads/main/logo.png")}");
+			this.v4Texture = await this.loader.loadAsync("${corsMoment("https://codeberg.org/RealPacket/VapeForMiniblox/raw/branch/main/assets/logov4.png")}");
 		}
 		async loadSpritesheet(){
 	`, true);
@@ -214,13 +273,20 @@ function modifyCode(text) {
 		}
 	`);
 
-	
+	// HOOKS
+	// instructions because this replacement is very vague when trying to find it after an update:
+	// 1. search for "moveFlying("
+	// 2. select the first result
+	// 3. look for "this.motion.z+="
+	// 4. use that as the replacement
+	// thanks GOD that I had the old bundle to find this
 	addModification('+=h*y+u*x}', `
 		if (this == player) {
 			for(const [index, func] of Object.entries(tickLoop)) if (func) func();
 		}
 	`);
 	addModification('this.game.unleash.isEnabled("disable-ads")', 'true', true);
+	// in EntityManager, renderEntities function
 	addModification('h.render()})', '; for(const [index, func] of Object.entries(renderTickLoop)) if (func) func();');
 	addModification('updateNameTag(){let h="white",p=1;', 'this.entity.team = this.entity.profile.cosmetics.color;');
 	addModification('connect(u,h=!1,p=!1){', 'lastJoined = u;');
@@ -232,7 +298,12 @@ function modifyCode(text) {
 			}, 400);
 		}
 	`);
-
+	// MUSIC FIX
+	addModification('const u=lodashExports.sample(MUSIC);',
+		`const vol = Options$1.sound.music.volume / BASE_VOLUME;
+		if (vol <= 0 && enabledModules["MusicFix"])
+			return; // don't play, we don't want to waste resources or bandwidth on this.
+		const u = lodashExports.sample(MUSIC);`, true)
 	addModification('ClientSocket.on("CPacketMessage",h=>{', `
 		if (player && h.text && !h.text.startsWith(player.name) && enabledModules["ChatDisabler"] && chatDelay < Date.now()) {
 			chatDelay = Date.now() + 1000;
@@ -253,7 +324,7 @@ function modifyCode(text) {
 			game.requestQueue();
 		}
 	`);
-	addModification('ClientSocket.on("CPacketUpdateStatus",h=>{', `
+	addModification('ClientSocket.on("CPacketUpdateStatus",h=>{', /*js*/`
 		if (h.rank && h.rank != "" && RANK.LEVEL[$.rank].permLevel > 2) {
 			game.chat.addChat({
 				text: "STAFF DETECTED : " + h.rank + "\\n".repeat(10),
@@ -306,6 +377,8 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 	// NOSLOWDOWN
 	addModification('updatePlayerMoveState(),this.isUsingItem()', 'updatePlayerMoveState(),(this.isUsingItem() && !enabledModules["NoSlowdown"])', true);
 	addModification('S&&!this.isUsingItem()', 'S&&!(this.isUsingItem() && !enabledModules["NoSlowdown"])', true);
+	// TODO: fix this
+	// addModification('0),this.sneak', ' && !enabledModules["NoSlowdown"]');
 
 	// STEP
 	addModification('p.y=this.stepHeight;', 'p.y=(enabledModules["Step"]?Math.max(stepheight[1],this.stepHeight):this.stepHeight);', true);
@@ -320,6 +393,12 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 
 	// INVWALK
 	addModification('keyPressed(m)&&Game.isActive(!1)', 'keyPressed(m)&&(Game.isActive(!1)||enabledModules["InvWalk"]&&!game.chat.showInput)', true);
+
+	// TIMER
+	addModification('MSPT=50,', '', true);
+	addModification('MODE="production";', 'let MSPT = 50;');
+	addModification('I(this,"controller");', 'I(this, "tickLoop");');
+	addModification('setInterval(()=>this.fixedUpdate(),MSPT)', 'this.tickLoop=setInterval(()=>this.fixedUpdate(),MSPT)', true);
 
 	// PHASE
 	addModification('calculateXOffset(A,this.getEntityBoundingBox(),g.x)', 'enabledModules["Phase"] ? g.x : calculateXOffset(A,this.getEntityBoundingBox(),g.x)', true);
@@ -362,6 +441,56 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 		}
 	`);
 
+	// SKIN
+	addModification('ClientSocket.on("CPacketSpawnPlayer",h=>{const p=m.world.getPlayerById(h.id);', `
+		if (h.socketId === player.socketId && enabledModules["AntiBan"]) {
+			hud3D.remove(hud3D.rightArm);
+			hud3D.rightArm = undefined;
+			player.profile.cosmetics.skin = "GrandDad";
+			h.cosmetics.skin = "GrandDad";
+			h.cosmetics.cape = "GrandDad";
+		}
+	`);
+	addModification('bob:{id:"bob",name:"Bob",tier:0,skinny:!1},', 'GrandDad:{id:"GrandDad",name:"GrandDad",tier:2,skinny:!1},');
+	addModification('cloud:{id:"cloud",name:"Cloud",tier:2},', 'GrandDad:{id:"GrandDad",name:"GrandDad",tier:2},');
+	addModification('async downloadSkin(u){', `
+		if (u == "GrandDad") {
+			const $ = skins[u];
+			return new Promise((et, tt) => {
+				textureManager.loader.load("${corsMoment("https://codeberg.org/RealPacket/VapeForMiniblox/raw/branch/main/assets/skin.png")}", rt => {
+					const nt = {
+						atlas: rt,
+						id: u,
+						skinny: $.skinny,
+						ratio: rt.image.width / 64
+					};
+					SkinManager.createAtlasMat(nt), this.skins[u] = nt, et();
+				}, void 0, function(rt) {
+					console.error(rt), et();
+				});
+			});
+		}
+	`);
+	addModification('async downloadCape(u){', `
+		if (u == "GrandDad") {
+			const $ = capes[u];
+			return new Promise((et, tt) => {
+				textureManager.loader.load("${corsMoment("https://codeberg.org/RealPacket/VapeForMiniblox/raw/branch/main/assets/cape.png")}", rt => {
+					const nt = {
+						atlas: rt,
+						id: u,
+						name: $.name,
+						ratio: rt.image.width / 64,
+						rankLevel: $.tier,
+						isCape: !0
+					};
+					SkinManager.createAtlasMat(nt), this.capes[u] = nt, et();
+				}, void 0, function(rt) {
+					console.error(rt), et();
+				});
+			});
+		}
+	`);
 
 	// LOGIN BYPASS
 	addModification('new SPacketLoginStart({requestedUuid:localStorage.getItem(REQUESTED_UUID_KEY)??void 0,session:localStorage.getItem(SESSION_TOKEN_KEY)??"",hydration:localStorage.getItem("hydration")??"0",metricsId:localStorage.getItem("metrics_id")??"",clientVersion:VERSION$1})', 'new SPacketLoginStart({requestedUuid:void 0,session:(enabledModules["AntiBan"] ? "" : (localStorage.getItem(SESSION_TOKEN_KEY) ?? "")),hydration:"0",metricsId:uuid$1(),clientVersion:VERSION$1})', true);
@@ -372,8 +501,28 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 	// SWING FIX
 	addModification('player.getActiveItemStack().item instanceof', 'null == ', true);
 
+	// CONTAINER FIX (vector is very smart)
+	/**
+	 Description:
+	 In some cases, player.openChest may not be defined.
+	 In those cases, it will be undefined.
+	 ```js
+	 const m = player.openContainer,
+	 u = m.getLowerChestInventory(),
+	 h = m.getLowerChestInventory().getSizeInventory() > 27,
+	 p = h ? 27 : 0;
+	 ```
+	 and because `u` is invoking a function in `m`,
+	 it'll throw an error and break all of the UI.
+	 */
+	addModification(
+		'const m=player.openContainer', /*js*/
+		`const m = player.openContainer ?? { getLowerChestInventory: () => {getSizeInventory: () => 0} }`,
+		true
+	);
+
 	// COMMANDS
-	addModification('submit(u){', `
+	addModification('submit(u){', /*js*/`
 		const str = this.inputValue.toLocaleLowerCase();
 		const args = str.split(" ");
 		let chatString;
@@ -468,17 +617,10 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 		if (enabledModules["FilterBypass"] && !this.inputValue.startsWith('/')) {
 			const words = this.inputValue.split(" ");
 			let newwords = [];
-			for(const word of words) newwords.push(word.charAt(0) + '‎' + word.slice(1));
+			for(const word of words) newwords.push(word.charAt(0) + '\\\\' + word.slice(1));
 			this.inputValue = newwords.join(' ');
 		}
 	`);
-
-	// CONTAINER FIX 
-	addModification(
-		'const m=player.openContainer',
-		`const m = player.openContainer ?? { getLowerChestInventory: () => {getSizeInventory: () => 0} }`,
-		true
-		);
 
 	// MAIN
 	addModification('document.addEventListener("contextmenu",m=>m.preventDefault());', /*js*/`
@@ -515,6 +657,8 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 					};
 				}
 				addoption(name, typee, defaultt) {
+					// ! the last item in the option array should never be changed.
+					// ! because it is used in the .reset command
 					this.options[name] = [typee, defaultt, name, defaultt];
 					return this.options[name];
 				}
@@ -533,13 +677,14 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 			});
 			new Module("AntiCheat", function(callback) {
 				if (!callback)
-					return; 
+					return; // TODO: deinitialization logic
 				const entities = game.world.entitiesDump;
 				for (const entity of entities) {
 						if (!entity instanceof EntityPlayer)
-							continue; 
+							continue; // only go through players
 						if (entity.mode.isCreative() || entity.mode.isSpectator())
-							continue; 
+							continue; // ignore Albert einstein or someone who died
+						// TODO: track the player's position and get the difference from previous position to new position.
 				}
 			})
 
@@ -790,7 +935,7 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 					let ticks = 0;
 					tickLoop["InfiniteFly"] = function() {
 						ticks++;
-						const dir = getMoveDirection(0.2);
+						const dir = getMoveDirection(ticks % 4 <= 2 ? 1 : 0.1);
 						player.motion.x = dir.x;
 						player.motion.z = dir.z;
 						const goUp = keyPressedDump("space");
@@ -798,7 +943,7 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 						if (goUp || goDown) {
 							player.motion.y = goUp ? infiniteFlyVert[1] : -infiniteFlyVert[1];
 						} else {
-							player.motion.y = 0;
+							player.motion.y = ticks % 11 ? 0 : (ticks % 0.12);
 						}
 					};
 				}
@@ -815,6 +960,7 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 			new Module("InvWalk", function() {});
 			new Module("KeepSprint", function() {});
 			new Module("NoSlowdown", function() {});
+			new Module("MusicFix", function() {});
 
 			// Speed
 			let speedvalue, speedjump, speedauto;
@@ -1089,76 +1235,144 @@ h.addVelocity(-Math.sin(this.yaw) * g * .5, .1, -Math.cos(this.yaw) * g * .5);
 				}
 			});
 
-			function dropSlot(index) {
-	playerControllerDump.windowClickDump(player.openContainer.windowId, index, 0, 0, player);
-	playerControllerDump.windowClickDump(player.openContainer.windowId, -999, 0, 0, player);
-}
+           const AutoDrop = new Module("AutoDrop", function (callback) {
+    if (!callback) {
+        delete tickLoop["AutoDrop"];
+        hud3D.remove("AutoDropOverlay");
+        return;
+    }
 
-const AutoDrop = new Module("AutoDrop", function(callback) {
-	if (callback) {
-		let dropVisuals = [];
-		const keptTypes = new Set();
+    let dropVisuals = new Map();
+    let dropTypeMap = new Map();
+    const bestArmor = {};
+    let lastRun = 0;
 
-		tickLoop["AutoDrop"] = function() {
-			dropVisuals = [];
-			if (!player.openContainer || player.openContainer !== player.inventoryContainer) return;
+    const weaponClasses = new Set(["ItemSword", "ItemAxe", "ItemBow", "ItemPickaxe"]);
+    const essentialsKeywords = ["gapple", "golden apple", "ender pearl", "fire charge"];
 
-			const slots = player.inventoryContainer.inventorySlots;
+    const armorMaterialPriority = ["leather", "chain", "iron", "diamond"];
+    const customArmorKeepList = ["god helmet", "legend boots"];
 
-			for (let i = 0; i < 36; i++) {
-				const slot = slots[i];
-				if (!slot || !slot.getHasStack()) continue;
+    function getArmorScore(stack) {
+        const item = stack.getItem();
+        const material = item.getArmorMaterial?.()?.toLowerCase?.() || "unknown";
+        const materialIndex = armorMaterialPriority.indexOf(material);
+        const materialScore = materialIndex === -1 ? -999 : materialIndex * 1000;
 
-				const stack = slot.getStack();
-				const item = stack.getItem();
-				const name = stack.getDisplayName().toLowerCase();
+        const durabilityScore = stack.getMaxDamage() - stack.getItemDamage();
+        return materialScore + durabilityScore;
+    }
 
-				const typeKey = item.constructor.name + (item instanceof ItemArmor ? "_" + item.armorType : "");
+    tickLoop["AutoDrop"] = function () {
+        const now = Date.now();
+        if (now - lastRun < 100) return;
+        lastRun = now;
 
-				// Keep special items
-				if (
-					name.includes("gapple") ||
-					name.includes("golden apple") ||
-					name.includes("ender pearl") ||
-					name.includes("fire charge")
-				) continue;
+        const keptTypes = new Set();
+        const toDrop = [];
 
-				// Block logic — drop if stack < 5
-				if (item instanceof ItemBlock) {
-					if (stack.stackSize >= 5) continue; // keep good stacks
-					dropSlot(i);
-					dropVisuals.push(i);
-					continue;
-				}
+        if (!player.openContainer || player.openContainer !== player.inventoryContainer) return;
+        const slots = player.inventoryContainer.inventorySlots;
+        if (!slots || slots.length < 36) return;
 
-				// First of a type is kept
-				if (!keptTypes.has(typeKey)) {
-					keptTypes.add(typeKey);
-					continue;
-				}
+        Object.keys(bestArmor).forEach(k => delete bestArmor[k]);
 
-				// Duplicate non-block → drop
-				dropSlot(i);
-				dropVisuals.push(i);
-			}
+        [5, 6, 7, 8].forEach(i => {
+            const slot = slots[i];
+            if (!slot?.getHasStack()) return;
+            const stack = slot.getStack();
+            if (!(stack.getItem() instanceof ItemArmor)) return;
+            const armorType = stack.getItem().armorType ?? "unknown";
+            bestArmor["armor_" + armorType] = { stack, index: i };
+        });
 
-			keptTypes.clear();
-		};
+        for (let i = 0; i < 36; i++) {
+            const slot = slots[i];
+            if (!slot?.getHasStack()) continue;
 
-		hud3D.add("AutoDropOverlay", () => {
-			for (const slot of dropVisuals) {
-				const x = (slot % 9) * 20 + 10;
-				const y = Math.floor(slot / 9) * 20 + 60;
-				drawImage("spritesheet.png", 32, 32, 16, 16, x, y, 16, 16, "rgba(255,0,0,0.6)");
-			}
-		});
-	} else {
-		delete tickLoop["AutoDrop"];
-		hud3D.remove("AutoDropOverlay");
-	}
+            const stack = slot.getStack();
+            const item = stack.getItem();
+            const name = stack.getDisplayName().toLowerCase();
+
+            if (essentialsKeywords.some(k => name.includes(k))) continue;
+            if (customArmorKeepList.some(k => name.includes(k))) continue;
+
+            if (item instanceof ItemBlock) {
+                if (stack.stackSize < 5) {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "block");
+                }
+                continue;
+            }
+
+            if (item instanceof ItemArmor) {
+                const armorType = item.armorType ?? "unknown";
+                const key = "armor_" + armorType;
+                const score = getArmorScore(stack);
+                const existing = bestArmor[key];
+                const existingScore = existing ? getArmorScore(existing.stack) : -1;
+
+                if (!existing || score > existingScore) {
+                    if (existing && existing.index !== i) {
+                        toDrop.push(existing.index);
+                        dropTypeMap.set(existing.index, "worse_armor");
+                    }
+                    bestArmor[key] = { stack, index: i };
+                } else {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "armor_dupe");
+                }
+                continue;
+            }
+
+            const className = item.constructor.name;
+            if (weaponClasses.has(className)) {
+                if (!keptTypes.has(className)) {
+                    keptTypes.add(className);
+                } else {
+                    toDrop.push(i);
+                    dropTypeMap.set(i, "weapon_dupe");
+                }
+                continue;
+            }
+
+            toDrop.push(i);
+            dropTypeMap.set(i, "junk");
+        }
+
+        toDrop.forEach(slot => {
+            dropSlot(slot);
+            dropVisuals.set(slot, now);
+        });
+
+        if (now % 1000 < 100) {
+            dropVisuals.forEach((time, slot) => {
+                if (now - time > 500) dropVisuals.delete(slot);
+            });
+        }
+    };
+
+    hud3D.add("AutoDropOverlay", function () {
+        dropVisuals.forEach((_, slot) => {
+            const x = (slot % 9) * 20 + 10;
+            const y = Math.floor(slot / 9) * 20 + 60;
+            const type = dropTypeMap.get(slot) || "junk";
+
+            let color = "rgba(255,0,0,0.6)";
+            if (type === "block") color = "rgba(128,128,128,0.6)";
+            else if (type === "armor_dupe") color = "rgba(255,255,0,0.6)";
+            else if (type === "worse_armor") color = "rgba(255,165,0,0.6)";
+            else if (type === "weapon_dupe") color = "rgba(0,255,255,0.6)";
+
+            drawImage("spritesheet.png", 32, 32, 16, 16, x, y, 16, 16, color);
+        });
+    });
 });
 
-
+function dropSlot(index) {
+    playerControllerDump.windowClickDump(player.openContainer.windowId, index, 0, 0, player);
+    playerControllerDump.windowClickDump(player.openContainer.windowId, -999, 0, 0, player);
+}
 
 			globalThis.${storeName}.modules = modules;
 			globalThis.${storeName}.profile = "default";
@@ -1271,247 +1485,214 @@ const AutoDrop = new Module("AutoDrop", function(callback) {
 	else {
 		execute(publicUrl);
 	}
-
-	// ClickGUI モジュール追加
-	let clickguiOpen = false;
-	let clickguiBind = [",", "Comma"];
-
-	// Impact風ClickGUI用CSSを追加
-	(function addClickGUICSS() {
-		if (document.getElementById("impact-clickgui-style")) return;
-		const style = document.createElement("style");
-		style.id = "impact-clickgui-style";
-		style.textContent = `
-		.impact-clickgui {
-			position: fixed;
-			top: 10%;
-			left: 50%;
-			transform: translateX(-50%);
-			min-width: 480px;
-			min-height: 400px;
-			background: rgba(20, 20, 20, 0.95);
-			border-radius: 12px;
-			box-shadow: 0 8px 32px #00ffcc44;
-			z-index: 99999;
-			color: #e0e0e0;
-			font-family: 'Segoe UI', 'Meiryo', 'Arial', sans-serif;
-			padding: 24px 32px 24px 32px;
-			display: flex;
-			flex-direction: column;
-			gap: 16px;
-			border: 2px solid #00c853;
-			animation: fadeInClickGUI 0.2s;
-		}
-		@keyframes fadeInClickGUI {
-			from { opacity: 0; transform: scale(0.95) translateX(-50%); }
-			to { opacity: 1; transform: scale(1) translateX(-50%); }
-		}
-		.impact-clickgui-title {
-			font-size: 2rem;
-			color: #00ffcc;
-			margin-bottom: 8px;
-			text-shadow: 0 2px 8px #00ffcc44;
-		}
-		.impact-clickgui-list {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 24px;
-		}
-		.impact-clickgui-module {
-			background: #181c1f;
-			border-radius: 8px;
-			padding: 12px 18px;
-			min-width: 180px;
-			box-shadow: 0 2px 8px #00ffcc22;
-			margin-bottom: 8px;
-			transition: background 0.2s, box-shadow 0.2s;
-		}
-		.impact-clickgui-module.active {
-			background: #00c85333;
-			box-shadow: 0 0 12px #00ffcc88;
-		}
-		.impact-clickgui-module:hover {
-			background: #222b2f;
-			box-shadow: 0 0 16px #00ffcc99;
-		}
-		.impact-clickgui-module-title {
-			font-size: 1.1rem;
-			font-weight: bold;
-			color: #00ffcc;
-			margin-bottom: 6px;
-			cursor: pointer;
-			user-select: none;
-		}
-		.impact-clickgui-options {
-			margin-top: 6px;
-			display: flex;
-			flex-direction: column;
-			gap: 4px;
-		}
-		.impact-clickgui-option {
-			display: flex;
-			align-items: center;
-			gap: 8px;
-			font-size: 0.95rem;
-		}
-		.impact-clickgui-option input[type="number"],
-		.impact-clickgui-option input[type="text"] {
-			background: #222b2f;
-			color: #e0e0e0;
-			border: 1px solid #00c853;
-			border-radius: 4px;
-			padding: 2px 6px;
-			width: 60px;
-		}
-		.impact-clickgui-option input[type="checkbox"] {
-			accent-color: #00ffcc;
-			width: 16px;
-			height: 16px;
-		}
-		.impact-clickgui-close {
-			position: absolute;
-			top: 12px;
-			right: 18px;
-			font-size: 1.5rem;
-			color: #00ffcc;
-			background: none;
-			border: none;
-			cursor: pointer;
-			transition: color 0.2s;
-		}
-		.impact-clickgui-close:hover {
-			color: #ff4444;
-		}
-		`;
-		document.head.appendChild(style);
-	})();
-
-	function openClickGUI() {
-		if (document.getElementById("impact-clickgui")) return;
-		clickguiOpen = true;
-		const gui = document.createElement("div");
-		gui.className = "impact-clickgui";
-		gui.id = "impact-clickgui";
-		gui.innerHTML = `
-			<div class="impact-clickgui-title">Impact ClickGUI</div>
-			<button class="impact-clickgui-close" title="閉じる">×</button>
-			<div class="impact-clickgui-list"></div>
-		`;
-		document.body.appendChild(gui);
-		gui.querySelector(".impact-clickgui-close").onclick = closeClickGUI;
-		renderClickGUI();
-		document.addEventListener("mousedown", clickOutsideClickGUI, true);
-	}
-
-	function closeClickGUI() {
-		clickguiOpen = false;
-		const gui = document.getElementById("impact-clickgui");
-		if (gui) gui.remove();
-		document.removeEventListener("mousedown", clickOutsideClickGUI, true);
-	}
-
-	function clickOutsideClickGUI(e) {
-		const gui = document.getElementById("impact-clickgui");
-		if (gui && !gui.contains(e.target)) {
-			closeClickGUI();
-		}
-	}
-
-	function renderClickGUI() {
-		const gui = document.getElementById("impact-clickgui");
-		if (!gui) return;
-		const list = gui.querySelector(".impact-clickgui-list");
-		list.innerHTML = "";
-		for (const [name, module] of Object.entries(modules)) {
-			if (name === "ClickGUI") continue;
-			const modDiv = document.createElement("div");
-			modDiv.className = "impact-clickgui-module" + (module.enabled ? " active" : "");
-			const title = document.createElement("div");
-			title.className = "impact-clickgui-module-title";
-			title.textContent = name;
-			title.onclick = () => {
-				module.toggle();
-				renderClickGUI();
-			};
-			modDiv.appendChild(title);
-			// オプション
-			if (module.options && Object.keys(module.options).length > 0) {
-				const optsDiv = document.createElement("div");
-				optsDiv.className = "impact-clickgui-options";
-				for (const [optName, optArr] of Object.entries(module.options)) {
-					const [type, value] = optArr;
-					const optDiv = document.createElement("div");
-					optDiv.className = "impact-clickgui-option";
-					const label = document.createElement("label");
-					label.textContent = optName;
-					optDiv.appendChild(label);
-					if (type === Number) {
-						const input = document.createElement("input");
-						input.type = "number";
-						input.value = value;
-						input.onchange = (e) => {
-							optArr[1] = Number(e.target.value);
-							if (module.enabled && module.func) module.func(true);
-						};
-						optDiv.appendChild(input);
-					} else if (type === Boolean) {
-						const input = document.createElement("input");
-						input.type = "checkbox";
-						input.checked = value;
-						input.onchange = (e) => {
-							optArr[1] = e.target.checked;
-							if (module.enabled && module.func) module.func(true);
-						};
-						optDiv.appendChild(input);
-					} else if (type === String) {
-						const input = document.createElement("input");
-						input.type = "text";
-						input.value = value;
-						input.onchange = (e) => {
-							optArr[1] = e.target.value;
-							if (module.enabled && module.func) module.func(true);
-						};
-						optDiv.appendChild(input);
-					}
-					optsDiv.appendChild(optDiv);
-				}
-				modDiv.appendChild(optsDiv);
-			}
-			list.appendChild(modDiv);
-		}
-	}
-
-	// ClickGUIモジュール本体
-	const clickguiModule = new Module("ClickGUI", function(callback) {
-		if (callback) {
-			openClickGUI();
-		} else {
-			closeClickGUI();
-		}
-	});
-	clickguiModule.setbind(",", true); // デフォルトで,キー
-
-	// キーバインドのグローバルハンドラ追加
-	window.addEventListener("keydown", function(e) {
-		// IME入力中は無視
-		if (e.isComposing || e.keyCode === 229) return;
-		// 日本語キーボードの,（け/、）やUSキーボードの,（Comma）
-		if ((e.key === "," || e.code === "Comma") && !e.repeat) {
-			if (!clickguiOpen) {
-				clickguiModule.toggle();
-			} else {
-				closeClickGUI();
-			}
-			e.preventDefault();
-		}
-		// .bindで変更された場合も対応
-		if (clickguiModule.bind && e.key === clickguiModule.bind && !e.repeat) {
-			if (!clickguiOpen) {
-				clickguiModule.toggle();
-			} else {
-				closeClickGUI();
-			}
-			e.preventDefault();
-		}
-	});
 })();
+// Load font for Minecraft look
+const fontLink = document.createElement("link");
+fontLink.href = "https://fonts.cdnfonts.com/css/minecraft-4";
+fontLink.rel = "stylesheet";
+document.head.appendChild(fontLink);
+
+await new Promise((resolve) => {
+	const loop = setInterval(() => {
+		if (unsafeWindow.globalThis[storeName]?.modules) {
+			clearInterval(loop);
+			resolve();
+		}
+	}, 10);
+});
+
+injectGUI(unsafeWindow.globalThis[storeName]);
+
+async function injectGUI(store) {
+	const style = document.createElement("style");
+	style.textContent = `
+		#clickGUI {
+			position: fixed; top: 100px; left: 100px;
+			width: 340px; max-height: 80vh;
+			overflow-y: auto;
+			background: rgba(15,15,15,0.95);
+			color: white;
+			font-family: monospace;
+			border: 2px solid lime;
+			padding: 10px; border-radius: 6px;
+			z-index: 999999; display: none;
+		}
+		#clickGUI h2 {
+			text-align: center; margin: 0 0 10px;
+			color: lime; cursor: move;
+		}
+		.module {
+			margin-bottom: 10px;
+			padding-bottom: 6px;
+			border-bottom: 1px dashed #444;
+		}
+		.toggle-btn {
+			float: right;
+			background: lime;
+			color: black;
+			border: none;
+			padding: 2px 6px;
+			border-radius: 4px;
+			cursor: pointer;
+			font-weight: bold;
+		}
+		.option-line {
+			margin: 4px 0;
+			font-size: 13px;
+		}
+		input[type="range"], input[type="text"] {
+			width: 100%;
+			font-size: 12px;
+		}
+		#guiControls {
+			margin-top: 12px;
+			text-align: center;
+		}
+		button.control {
+			background: black;
+			color: lime;
+			border: 1px solid lime;
+			padding: 5px 8px;
+			margin: 2px;
+			cursor: pointer;
+			font-family: monospace;
+		}
+	`;
+	document.head.appendChild(style);
+
+	const gui = document.createElement("div");
+	gui.id = "clickGUI";
+	gui.innerHTML = `<h2 id="clickHeader">IMPACT GUI v3</h2>`;
+	document.body.appendChild(gui);
+
+	let drag = false, dx = 0, dy = 0;
+	const header = gui.querySelector("#clickHeader");
+	header.onmousedown = e => { drag = true; dx = e.clientX - gui.offsetLeft; dy = e.clientY - gui.offsetTop; };
+	document.onmouseup = () => drag = false;
+	document.onmousemove = e => {
+		if (drag) {
+			gui.style.left = (e.clientX - dx) + "px";
+			gui.style.top = (e.clientY - dy) + "px";
+		}
+	};
+
+	for (const [name, mod] of Object.entries(store.modules)) {
+		const box = document.createElement("div");
+		box.className = "module";
+
+		const toggle = document.createElement("button");
+		toggle.className = "toggle-btn";
+		toggle.textContent = mod.enabled ? "ON" : "OFF";
+		toggle.onclick = () => {
+			mod.toggle();
+			toggle.textContent = mod.enabled ? "ON" : "OFF";
+		};
+
+		box.innerHTML = `<b>${name}</b>`;
+		box.appendChild(toggle);
+
+		if (mod.options) {
+			for (const [optName, opt] of Object.entries(mod.options)) {
+				const [type, val, label] = opt;
+				const line = document.createElement("div");
+				line.className = "option-line";
+				line.innerText = label + ": ";
+
+				if (type === Boolean) {
+					const cb = document.createElement("input");
+					cb.type = "checkbox";
+					cb.checked = val;
+					cb.onchange = () => { opt[1] = cb.checked; };
+					line.appendChild(cb);
+				} else if (type === Number) {
+					const slider = document.createElement("input");
+					slider.type = "range";
+					slider.min = 0;
+					slider.max = 10;
+					slider.step = 0.1;
+					slider.value = val;
+					slider.oninput = () => { opt[1] = parseFloat(slider.value); };
+					line.appendChild(slider);
+				} else if (type === String) {
+					const input = document.createElement("input");
+					input.type = "text";
+					input.value = val;
+					input.onchange = () => { opt[1] = input.value; };
+					line.appendChild(input);
+				}
+				box.appendChild(line);
+			}
+		}
+
+		const bindLine = document.createElement("div");
+		bindLine.className = "option-line";
+		bindLine.innerHTML = `Bind: <input type="text" style="width: 60px;" value="${mod.bind}">`;
+		bindLine.querySelector("input").onchange = e => mod.setbind(e.target.value);
+		box.appendChild(bindLine);
+
+		gui.appendChild(box);
+	}
+
+	const ctrl = document.createElement("div");
+	ctrl.id = "guiControls";
+	ctrl.innerHTML = `
+		<button class="control" onclick="navigator.clipboard.writeText(GM_getValue('vapeConfig' + unsafeWindow.__VAPE__.profile))">Export</button>
+		<button class="control" onclick="navigator.clipboard.readText().then(txt => { GM_setValue('vapeConfig' + unsafeWindow.__VAPE__.profile, txt); unsafeWindow.__VAPE__.loadVapeConfig(); })">Import</button>
+		<button class="control" onclick="unsafeWindow.__VAPE__.saveVapeConfig()">Save</button>
+		<button class="control" onclick="unsafeWindow.__VAPE__.loadVapeConfig()">Load</button>
+	`;
+	gui.appendChild(ctrl);
+
+	const themeBtn = document.createElement("button");
+	themeBtn.className = "control";
+	themeBtn.textContent = "Toggle Theme";
+	ctrl.appendChild(themeBtn);
+
+	let visible = false;
+	document.addEventListener("keydown", e => {
+		if (e.code === "ShiftLeft") {
+			visible = !visible;
+			gui.style.display = visible ? "block" : "none";
+		}
+	});
+
+	let theme = await GM_getValue("guiTheme", "dark");
+	applyTheme(theme);
+	themeBtn.onclick = () => {
+		theme = theme === "dark" ? "minecraft" : "dark";
+		GM_setValue("guiTheme", theme);
+		applyTheme(theme);
+	};
+
+	function applyTheme(mode) {
+		const root = document.getElementById("clickGUI");
+		if (!root) return;
+
+		const buttons = root.querySelectorAll("button");
+
+		if (mode === "minecraft") {
+			root.style.background = 'url("https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets/assets/minecraft/textures/block/stone.png") repeat';
+			root.style.backgroundSize = "auto";
+			root.style.color = "#00ff00";
+			root.style.border = "3px double #00ff00";
+			root.style.fontFamily = '"Minecraft", monospace';
+			buttons.forEach(btn => {
+				btn.style.background = "#1a1a1a";
+				btn.style.color = "#00ff00";
+				btn.style.border = "1px solid #00ff00";
+				btn.style.fontFamily = '"Minecraft", monospace';
+			});
+		} else {
+			root.style.background = "rgba(15, 15, 15, 0.95)";
+			root.style.color = "#fff";
+			root.style.border = "2px solid lime";
+			root.style.fontFamily = "monospace";
+			buttons.forEach(btn => {
+				btn.style.background = "black";
+				btn.style.color = "lime";
+				btn.style.border = "1px solid lime";
+				btn.style.fontFamily = "monospace";
+			});
+		}
+	}
+}
